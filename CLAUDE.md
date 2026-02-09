@@ -4,13 +4,140 @@ This file provides guidance for AI assistants working on the WeeklyScoreCard rep
 
 ## Project Overview
 
-**WeeklyScoreCard** is a project for tracking and displaying weekly scores/metrics. The repository is in its initial state and is being bootstrapped.
+**WeeklyScoreCard** is a serverless API that generates AI-powered weekly development scorecards. It connects three services:
+
+1. **GitHub API** (via Octokit) — fetches commits, pull requests, and issues for a repository
+2. **Claude AI** (via Anthropic SDK) — analyzes the activity and produces a narrative scorecard with a score
+3. **Cloudflare Workers** (via Hono) — hosts the API as a serverless edge function
 
 ## Repository Status
 
-- **Current state**: New repository — no application code, dependencies, or configuration files exist yet.
 - **Remote**: `MarciB123/WeeklyScoreCard`
-- **Primary branch**: `main` (not yet created — first commit will establish it)
+- **Primary branch**: `main`
+- **Runtime**: Cloudflare Workers (Node.js-compatible)
+- **Language**: TypeScript (strict mode)
+
+## File Structure
+
+```
+WeeklyScoreCard/
+├── CLAUDE.md               # AI assistant guidance (this file)
+├── package.json            # Dependencies and scripts
+├── tsconfig.json           # TypeScript configuration
+├── wrangler.toml           # Cloudflare Workers config
+├── vitest.config.ts        # Test runner config
+├── .gitignore
+├── .dev.vars.example       # Template for local secrets
+└── src/
+    ├── index.ts            # Worker entry point — Hono routes
+    ├── types.ts            # Shared TypeScript interfaces
+    ├── github.ts           # GitHub API integration (Octokit)
+    ├── claude.ts           # Claude AI integration (Anthropic SDK)
+    └── __tests__/
+        └── scorecard.test.ts   # Unit tests for stats logic
+```
+
+## Key Commands
+
+```bash
+npm install              # Install dependencies
+npm run dev              # Start local dev server (wrangler dev)
+npm run deploy           # Deploy to Cloudflare Workers
+npm test                 # Run tests (vitest)
+npm run test:watch       # Run tests in watch mode
+npm run lint             # Type-check with tsc --noEmit
+```
+
+## Project Setup
+
+### Prerequisites
+
+- Node.js >= 18
+- npm
+- A [Cloudflare account](https://dash.cloudflare.com/) (for deployment)
+- A GitHub personal access token (for the GitHub API)
+- An Anthropic API key (for Claude)
+
+### Local Development
+
+1. `npm install`
+2. Copy `.dev.vars.example` to `.dev.vars` and fill in your secrets:
+   ```
+   GITHUB_TOKEN=ghp_...
+   ANTHROPIC_API_KEY=sk-ant-...
+   ```
+3. `npm run dev` — starts the Worker locally at `http://localhost:8787`
+
+### Deploying to Cloudflare
+
+1. `npx wrangler login` — authenticate with Cloudflare
+2. Set secrets:
+   ```bash
+   npx wrangler secret put GITHUB_TOKEN
+   npx wrangler secret put ANTHROPIC_API_KEY
+   ```
+3. `npm run deploy`
+
+## API Endpoints
+
+| Method | Path                              | Description                          |
+|--------|-----------------------------------|--------------------------------------|
+| GET    | `/api/health`                     | Health check                         |
+| POST   | `/api/scorecard`                  | Generate scorecard (JSON body)       |
+| GET    | `/api/scorecard/:owner/:repo`     | Generate scorecard (path params)     |
+
+### POST `/api/scorecard` body
+
+```json
+{
+  "owner": "MarciB123",
+  "repo": "WeeklyScoreCard",
+  "since": "2025-01-01T00:00:00Z"   // optional, defaults to 7 days ago
+}
+```
+
+### Response shape
+
+```json
+{
+  "owner": "MarciB123",
+  "repo": "WeeklyScoreCard",
+  "period": { "since": "...", "until": "..." },
+  "stats": {
+    "totalCommits": 12,
+    "totalPRsOpened": 3,
+    "totalPRsMerged": 2,
+    "totalIssuesOpened": 1,
+    "totalIssuesClosed": 4
+  },
+  "analysis": "Claude's narrative analysis and score..."
+}
+```
+
+## Architecture Notes
+
+### Request Flow
+
+```
+Client → Cloudflare Worker (Hono router)
+           ├─→ GitHub API (Octokit) — fetch weekly activity
+           └─→ Claude AI (Anthropic SDK) — analyze activity
+         ← JSON scorecard response
+```
+
+### Key Design Decisions
+
+- **Hono** was chosen as the web framework for its lightweight size and first-class Cloudflare Workers support.
+- **Octokit** is the official GitHub SDK — handles auth, pagination, and rate limiting.
+- **Anthropic SDK** communicates directly with the Claude API for analysis.
+- All modules are pure TypeScript with no Cloudflare-specific APIs beyond the Worker entry point, making them testable in isolation.
+
+### Environment Bindings
+
+Secrets are injected by Cloudflare Workers at runtime (see `Env` type in `src/types.ts`):
+- `GITHUB_TOKEN` — GitHub personal access token
+- `ANTHROPIC_API_KEY` — Anthropic API key
+- `ENVIRONMENT` — set in `wrangler.toml` (currently `"production"`)
 
 ## Development Guidelines
 
@@ -21,73 +148,28 @@ This file provides guidance for AI assistants working on the WeeklyScoreCard rep
 - Push with `git push -u origin <branch-name>`.
 - Open pull requests for review before merging to `main`.
 
-### Code Conventions (to adopt as the project grows)
+### Code Conventions
 
-- Keep code simple and avoid over-engineering.
-- Prefer small, focused files and functions.
-- Write tests alongside new features.
-- Document public APIs and non-obvious logic with brief comments.
+- **TypeScript strict mode** — no `any` types without justification.
+- Keep modules small and focused: `github.ts` owns GitHub concerns, `claude.ts` owns AI concerns.
+- Export only what other modules need; keep helpers private.
+- Use JSDoc comments on exported functions.
 
-### When Adding Dependencies
+### Adding Dependencies
 
 - Choose well-maintained, widely-used libraries.
 - Pin dependency versions for reproducibility.
 - Document why a dependency was added if the reason isn't obvious.
 
-## Project Setup
-
-No setup steps are required yet. When application code is added, update this section with:
-
-1. Prerequisites (Node.js version, etc.)
-2. Install command (`npm install`, `pip install`, etc.)
-3. Environment variable configuration
-4. How to run the development server
-5. How to run tests
-6. How to build for production
-
-## File Structure
-
-```
-WeeklyScoreCard/
-├── CLAUDE.md          # This file — AI assistant guidance
-└── .git/              # Git metadata
-```
-
-> Update this tree as the project structure evolves.
-
-## Key Commands
-
-_No commands configured yet. Add build, test, lint, and run commands here as they are set up._
-
-```
-# Example placeholders — replace when tooling is chosen:
-# npm install        — install dependencies
-# npm run dev        — start development server
-# npm test           — run test suite
-# npm run build      — production build
-# npm run lint       — run linter
-```
-
-## Architecture Notes
-
-_To be documented once the tech stack and application architecture are chosen._
-
-Topics to cover when updating:
-- Framework and language choices
-- Directory layout conventions (e.g., `src/`, `tests/`, `public/`)
-- State management approach
-- Data storage / database
-- API design patterns
-- Authentication / authorization strategy
-
 ## Testing
 
-_No test framework configured yet._ When tests are added, document:
-- Test framework and runner
-- How to run unit vs integration vs e2e tests
-- Test file naming conventions (e.g., `*.test.ts`, `*.spec.ts`)
-- Mocking strategies
+- **Framework**: Vitest
+- **Test location**: `src/__tests__/`
+- **Naming convention**: `*.test.ts`
+- **Run**: `npm test` or `npm run test:watch`
+
+Tests focus on pure logic (stats computation, prompt building). Integration tests against live APIs should be added as the project matures, gated behind environment checks.
 
 ## Updating This File
 
-Keep this file current as the project evolves. After significant changes (new framework, restructured directories, added tooling), update the relevant sections so AI assistants always have accurate context.
+Keep this file current as the project evolves. After significant changes (new endpoints, restructured directories, added tooling), update the relevant sections so AI assistants always have accurate context.
