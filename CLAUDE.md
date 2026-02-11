@@ -4,140 +4,110 @@ This file provides guidance for AI assistants working on the WeeklyScoreCard rep
 
 ## Project Overview
 
-**WeeklyScoreCard** is a serverless API that generates AI-powered weekly development scorecards. It connects three services:
-
-1. **GitHub API** (via Octokit) — fetches commits, pull requests, and issues for a repository
-2. **Claude AI** (via Anthropic SDK) — analyzes the activity and produces a narrative scorecard with a score
-3. **Cloudflare Workers** (via Hono) — hosts the API as a serverless edge function
+**WeeklyScoreCard** is a web-based weekly performance tracker for 4 restaurant locations (Cardiff, Carlsbad, Del Mar, Carmel Valley). It displays a rolling 10-week view of key metrics including sales, labor costs, ticket times, and reviews.
 
 ## Repository Status
 
 - **Remote**: `MarciB123/WeeklyScoreCard`
 - **Primary branch**: `main`
-- **Runtime**: Cloudflare Workers (Node.js-compatible)
-- **Language**: TypeScript (strict mode)
+- **Type**: Static single-page application (SPA)
+- **Framework**: React 18 (loaded via CDN)
+- **Styling**: Tailwind CSS (loaded via CDN)
+- **Hosting**: Cloudflare Workers (static HTML file)
+- **Data Storage**: Browser localStorage (data persists per device/browser)
+- **Build Process**: None required — single HTML file runs directly in browser
 
 ## File Structure
 
 ```
 WeeklyScoreCard/
 ├── CLAUDE.md               # AI assistant guidance (this file)
-├── package.json            # Dependencies and scripts
-├── tsconfig.json           # TypeScript configuration
-├── wrangler.toml           # Cloudflare Workers config
-├── vitest.config.ts        # Test runner config
-├── .gitignore
-├── .dev.vars.example       # Template for local secrets
-└── src/
-    ├── index.ts            # Worker entry point — Hono routes
-    ├── types.ts            # Shared TypeScript interfaces
-    ├── github.ts           # GitHub API integration (Octokit)
-    ├── claude.ts           # Claude AI integration (Anthropic SDK)
-    └── __tests__/
-        └── scorecard.test.ts   # Unit tests for stats logic
+├── index.html              # The entire application (single file)
+└── ...
 ```
 
-## Key Commands
+The application is a single `index.html` file containing all HTML, CSS, and JavaScript. React and Tailwind CSS are loaded from CDN.
 
-```bash
-npm install              # Install dependencies
-npm run dev              # Start local dev server (wrangler dev)
-npm run deploy           # Deploy to Cloudflare Workers
-npm test                 # Run tests (vitest)
-npm run test:watch       # Run tests in watch mode
-npm run lint             # Type-check with tsc --noEmit
-```
+## Current Features
 
-## Project Setup
+- **4 store tabs** — Click to switch between locations (Cardiff, Carlsbad, Del Mar, Carmel Valley)
+- **Rolling 10-week view** — Most recent week at top, oldest at bottom (shows actual dates like "1/27-2/2")
+- **Auto-calculated fields**:
+  - Sales vs Goal %
+  - Sales vs Forecast $
+  - Sales vs Last Week (up/down arrows)
+  - Labor Cost %
+  - Labor Goal %
+- **Color coding** — Green when hitting goals, red when missing
+- **Locked fields** — Sales Goal, Labor Goal, Hours Allowed (managed separately)
+- **10-Week Averages panel** — Shows avg sales, avg labor cost %, avg ticket time, avg reviews per week
+- **Save Data button** — Saves data to browser localStorage
+- **Add New Week button** — Protected by access code entry
+- **Number formatting** — Dollar signs and commas auto-added (e.g., $25,000)
 
-### Prerequisites
+## Data Columns (in order)
 
-- Node.js >= 18
-- npm
-- A [Cloudflare account](https://dash.cloudflare.com/) (for deployment)
-- A GitHub personal access token (for the GitHub API)
-- An Anthropic API key (for Claude)
+1. Week (date range)
+2. Sales Actual
+3. vs Last Wk
+4. Sales Goal (locked)
+5. Sales vs Goal %
+6. Sales Forecast
+7. Sales vs Forecast $
+8. Labor Actual $
+9. Labor Forecast $
+10. Labor Goal $ (locked)
+11. Labor Cost %
+12. Labor Goal %
+13. Hours Used
+14. Hours Scheduled
+15. Hours Allowed (locked)
+16. Tickets
+17. Ticket Time
+18. Reviews
 
-### Local Development
+## Access Codes
 
-1. `npm install`
-2. Copy `.dev.vars.example` to `.dev.vars` and fill in your secrets:
-   ```
-   GITHUB_TOKEN=ghp_...
-   ANTHROPIC_API_KEY=sk-ant-...
-   ```
-3. `npm run dev` — starts the Worker locally at `http://localhost:8787`
+- **2046** — Adds a new week (shifts all data forward)
+- **5069** — Removes a week (shifts all data backward)
 
-### Deploying to Cloudflare
+## Locked Fields
 
-1. `npx wrangler login` — authenticate with Cloudflare
-2. Set secrets:
-   ```bash
-   npx wrangler secret put GITHUB_TOKEN
-   npx wrangler secret put ANTHROPIC_API_KEY
-   ```
-3. `npm run deploy`
+These fields are managed separately and not editable in the normal data entry flow:
+- Sales Goal
+- Labor Goal
+- Hours Allowed
 
-## API Endpoints
+## Deployment (Cloudflare Workers)
 
-| Method | Path                              | Description                          |
-|--------|-----------------------------------|--------------------------------------|
-| GET    | `/api/health`                     | Health check                         |
-| POST   | `/api/scorecard`                  | Generate scorecard (JSON body)       |
-| GET    | `/api/scorecard/:owner/:repo`     | Generate scorecard (path params)     |
+1. Go to dash.cloudflare.com
+2. Click **Workers & Pages** in sidebar
+3. Select your project or create new one
+4. Click **Deployments** > **Create deployment**
+5. Create a folder containing `index.html`
+6. Drag the folder into the upload box
+7. Click **Deploy**
+8. Access via your `.pages.dev` URL
 
-### POST `/api/scorecard` body
+## Local Testing
 
-```json
-{
-  "owner": "MarciB123",
-  "repo": "WeeklyScoreCard",
-  "since": "2025-01-01T00:00:00Z"   // optional, defaults to 7 days ago
-}
-```
+Double-click `index.html` to open in a browser. No build step or server required.
 
-### Response shape
+## Code Rules
 
-```json
-{
-  "owner": "MarciB123",
-  "repo": "WeeklyScoreCard",
-  "period": { "since": "...", "until": "..." },
-  "stats": {
-    "totalCommits": 12,
-    "totalPRsOpened": 3,
-    "totalPRsMerged": 2,
-    "totalIssuesOpened": 1,
-    "totalIssuesClosed": 4
-  },
-  "analysis": "Claude's narrative analysis and score..."
-}
-```
+- File must be named exactly `index.html` — required for web hosting
+- Save as plain text — no rich text formatting
+- Test locally first — open in browser before uploading to Cloudflare
+- Data saves to browser localStorage — persists on the same device/browser
+- All code (HTML, CSS, JavaScript/React) lives in the single `index.html` file
+- React 18 is loaded via CDN (not installed locally)
+- Tailwind CSS is loaded via CDN (not installed locally)
 
-## Architecture Notes
+## Design Specs
 
-### Request Flow
-
-```
-Client → Cloudflare Worker (Hono router)
-           ├─→ GitHub API (Octokit) — fetch weekly activity
-           └─→ Claude AI (Anthropic SDK) — analyze activity
-         ← JSON scorecard response
-```
-
-### Key Design Decisions
-
-- **Hono** was chosen as the web framework for its lightweight size and first-class Cloudflare Workers support.
-- **Octokit** is the official GitHub SDK — handles auth, pagination, and rate limiting.
-- **Anthropic SDK** communicates directly with the Claude API for analysis.
-- All modules are pure TypeScript with no Cloudflare-specific APIs beyond the Worker entry point, making them testable in isolation.
-
-### Environment Bindings
-
-Secrets are injected by Cloudflare Workers at runtime (see `Env` type in `src/types.ts`):
-- `GITHUB_TOKEN` — GitHub personal access token
-- `ANTHROPIC_API_KEY` — Anthropic API key
-- `ENVIRONMENT` — set in `wrangler.toml` (currently `"production"`)
+- **Font**: Default system font
+- **Colors**: Default Tailwind colors — blue tabs, green/red for goal indicators, purple save button
+- **Number format**: Dollar signs on money fields, commas for thousands, "min" suffix on ticket time
 
 ## Development Guidelines
 
@@ -150,26 +120,11 @@ Secrets are injected by Cloudflare Workers at runtime (see `Env` type in `src/ty
 
 ### Code Conventions
 
-- **TypeScript strict mode** — no `any` types without justification.
-- Keep modules small and focused: `github.ts` owns GitHub concerns, `claude.ts` owns AI concerns.
-- Export only what other modules need; keep helpers private.
-- Use JSDoc comments on exported functions.
-
-### Adding Dependencies
-
-- Choose well-maintained, widely-used libraries.
-- Pin dependency versions for reproducibility.
-- Document why a dependency was added if the reason isn't obvious.
-
-## Testing
-
-- **Framework**: Vitest
-- **Test location**: `src/__tests__/`
-- **Naming convention**: `*.test.ts`
-- **Run**: `npm test` or `npm run test:watch`
-
-Tests focus on pure logic (stats computation, prompt building). Integration tests against live APIs should be added as the project matures, gated behind environment checks.
+- Keep all code in the single `index.html` file.
+- Use React functional components with hooks for state management.
+- Use Tailwind utility classes for styling.
+- Maintain clear separation between data logic and presentation within the file.
 
 ## Updating This File
 
-Keep this file current as the project evolves. After significant changes (new endpoints, restructured directories, added tooling), update the relevant sections so AI assistants always have accurate context.
+Keep this file current as the project evolves. After significant changes (new features, new columns, changed access codes, styling changes), update the relevant sections so AI assistants always have accurate context.
